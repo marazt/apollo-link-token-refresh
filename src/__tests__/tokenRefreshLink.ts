@@ -80,8 +80,7 @@ describe('TokenRefreshLink', () => {
     expect(
       execute(link, {
         query: sampleQuery
-      }),
-      done()
+      })
     ).toThrow();
   });
 

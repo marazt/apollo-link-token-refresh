@@ -41,7 +41,7 @@ const throwServerError = (response, result, message) => {
   throw error;
 };
 
-const parseAndCheckResponse = (request, accessTokenField) => (response: Response) => {
+const parseAndCheckResponse = (request, returnWholeResponseObject, accessTokenField) => (response: Response) => {
   return response
     .text()
     .then(bodyText => {
@@ -69,7 +69,7 @@ const parseAndCheckResponse = (request, accessTokenField) => (response: Response
           `Response not successful: Received status code ${response.status}`,
         );
       }
-      if (!parsedBody.hasOwnProperty(accessTokenField) && !parsedBody.hasOwnProperty('errors')) {
+      if ((!returnWholeResponseObject && !parsedBody.hasOwnProperty(accessTokenField)) && !parsedBody.hasOwnProperty('errors')) {
         //Data error
         throwServerError(
           response,
@@ -83,6 +83,7 @@ const parseAndCheckResponse = (request, accessTokenField) => (response: Response
 };
 
 export class TokenRefreshLink extends ApolloLink {
+  private returnWholeResponseObject: boolean;
   private accessTokenField: string;
   private fetching: boolean;
   private isTokenValidOrUndefined: IsTokenValidOrUndefined;
@@ -92,6 +93,7 @@ export class TokenRefreshLink extends ApolloLink {
   private queue: OperationQueuing;
 
   constructor(params: {
+    returnWholeResponseObject?: boolean,
     accessTokenField?: string;
     isTokenValidOrUndefined: IsTokenValidOrUndefined;
     fetchAccessToken: FetchAccessToken;
@@ -99,7 +101,7 @@ export class TokenRefreshLink extends ApolloLink {
     handleError?: HandleError;
   }) {
     super();
-
+    this.returnWholeResponseObject = (params && params.returnWholeResponseObject) || false;
     this.accessTokenField = (params && params.accessTokenField) || 'access_token';
     this.fetching = false;
     this.isTokenValidOrUndefined = params.isTokenValidOrUndefined;
@@ -130,8 +132,11 @@ export class TokenRefreshLink extends ApolloLink {
     if (!this.fetching) {
       this.fetching = true;
       this.fetchAccessToken()
-        .then(parseAndCheckResponse(operation, this.accessTokenField))
+        .then(parseAndCheckResponse(operation, this.returnWholeResponseObject, this.accessTokenField))
         .then(body => {
+          if (this.returnWholeResponseObject) {
+            return body;
+          }
           if (!body[this.accessTokenField]) {
             throw new Error('[Token Refresh Link]: Unable to retrieve new access token');
           }
